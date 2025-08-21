@@ -1,0 +1,42 @@
+{
+  "name": "financelaborunion",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "deploy": "npm run build && zip -r lambda-deployment.zip dist/ node_modules/",
+    "test": "jest",
+    "format": "prettier --write \"src/**/*.{ts,js,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,js,json}\"",
+    "lint": "eslint src/**/*.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "aws-lambda": "^1.0.7",
+    "csv-parser": "^3.2.0",
+    "nodemailer": "^7.0.5",
+    "googleapis": "^156.0.0",
+    "@types/aws-lambda": "^8.10.152",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "@types/node": "^24.3.0",
+    "@types/nodemailer": "^7.0.1",
+    "ts-node": "^10.9.2",
+    "jest": "^30.0.5",
+    "@types/jest": "^30.0.0",
+    "prettier": "^3.6.2",
+    "@typescript-eslint/eslint-plugin": "^8.40.0",
+    "@typescript-eslint/parser": "^8.40.0",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "@types/express": "^5.0.3"
+  }
+}
