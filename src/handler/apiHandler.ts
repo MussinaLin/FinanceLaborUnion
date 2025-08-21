@@ -45,6 +45,18 @@ export class ApiHandler {
         data: {
           method: event.httpMethod,
           path: event.path,
+          services: {
+            email: {
+              available: this.emailService.isConnected(),
+              connectionInfo: this.emailService.getConnectionInfo(),
+            },
+            // googleDocs: {
+            //   available: this.googleDocsService.isAvailable(),
+            // },
+            // csv: {
+            //   available: true, // CSV service doesn't require external connections
+            // },
+          },
         },
       };
 
@@ -107,51 +119,74 @@ export class ApiHandler {
   /**
    * Send email endpoint handler
    */
-  //   async handleSendEmail(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-  //     try {
-  //       const body = event.body ? JSON.parse(event.body) : {};
-  //       const { to, subject, text, html, csvData, csvFilename } = body;
+  async handleSendEmail(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+    try {
+      // Check if email service is properly configured
+      if (!this.emailService.isConnected()) {
+        return this.createResponse(503, {
+          success: false,
+          message: 'Email service not available. Please check Gmail configuration.',
+          connectionInfo: this.emailService.getConnectionInfo(),
+        });
+      }
 
-  //       if (!to || !subject || (!text && !html)) {
-  //         return this.createResponse(400, {
-  //           success: false,
-  //           message: 'Please provide to, subject, and either text or html content',
-  //         });
-  //       }
+      const body = event.body ? JSON.parse(event.body) : {};
+      const { to, subject, text, html, csvData, csvFilename, batchSize = 5, delayMs = 3450 } = body;
 
-  //       let emailSent: boolean;
+      // Handle batch emails (same content for multiple recipients)
+      if (!to || !subject || (!text && !html)) {
+        return this.createResponse(400, {
+          success: false,
+          message: 'Please provide to (array), subject, and either text or html content',
+          example: {
+            to: ['email1@example.com', 'email2@example.com'],
+            subject: 'Your subject',
+            text: 'Your message',
+            batchSize: 5,
+            delayMs: 1000,
+          },
+        });
+      }
 
-  //       if (csvData) {
-  //         emailSent = await this.emailService.sendEmailWithCSV(
-  //           to,
-  //           subject,
-  //           text || '',
-  //           csvData,
-  //           csvFilename || 'data.csv',
-  //         );
-  //       } else {
-  //         emailSent = await this.emailService.sendEmail({
-  //           to,
-  //           subject,
-  //           text,
-  //           html,
-  //         });
-  //       }
+      // Ensure 'to' is an array
+      const recipients = Array.isArray(to) ? to : [to];
 
-  //       const response: ApiResponse = {
-  //         success: emailSent,
-  //         message: emailSent ? 'Email sent successfully' : 'Failed to send email',
-  //       };
+      if (recipients.length === 0) {
+        return this.createResponse(400, {
+          success: false,
+          message: 'Recipients array cannot be empty',
+        });
+      }
 
-  //       return this.createResponse(emailSent ? 200 : 500, response);
-  //     } catch (error) {
-  //       console.error('Error sending email:', error);
-  //       return this.createResponse(500, {
-  //         success: false,
-  //         message: error instanceof Error ? error.message : 'Failed to send email',
-  //       });
-  //     }
-  //   }
+      let result;
+
+      if (csvData) {
+        result = await this.emailService.sendEmailWithCSV(
+          recipients,
+          subject,
+          text || '',
+          csvData,
+          csvFilename || 'data.csv',
+        );
+      } else {
+        result = await this.emailService.sendEmail(recipients, { subject, text, html }, batchSize, delayMs);
+      }
+
+      const response = {
+        success: result.successCount > 0,
+        message: `Sent ${result.successCount}/${result.totalEmails} emails successfully`,
+        data: result,
+      };
+
+      return this.createResponse(result.successCount > 0 ? 200 : 500, response);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      return this.createResponse(500, {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to send email',
+      });
+    }
+  }
 
   /**
    * Google Docs reading endpoint handler
@@ -222,8 +257,9 @@ export class ApiHandler {
       //   case '/csv':
       //     return this.handleReadCSV(event);
 
-      //   case '/email':
-      //     return this.handleSendEmail(event);
+      case '/email':
+      case '/email/batch':
+        return this.handleSendEmail(event);
 
       case '/docs':
         return this.handleReadGoogleDocs(event);

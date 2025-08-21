@@ -9,13 +9,24 @@ export interface EmailConfig {
 }
 
 export interface EmailOptions {
-  to: string;
   subject: string;
   text?: string;
   html?: string;
   attachments?: Array<{
     filename: string;
     content: string | Buffer;
+  }>;
+}
+
+export interface BatchEmailResult {
+  totalEmails: number;
+  successCount: number;
+  failureCount: number;
+  results: Array<{
+    to: string;
+    success: boolean;
+    messageId?: string;
+    error?: string;
   }>;
 }
 
