@@ -17,27 +17,28 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@types/aws-lambda": "^8.10.152",
     "aws-lambda": "^1.0.7",
     "csv-parser": "^3.2.0",
-    "nodemailer": "^7.0.5",
-    "googleapis": "^156.0.0",
-    "@types/aws-lambda": "^8.10.152",
+    "dotenv": "^17.2.1",
+    "ecpay_aio_nodejs": "^1.2.2",
     "express": "^5.1.0",
-    "dotenv": "^17.2.1"
+    "googleapis": "^156.0.0",
+    "nodemailer": "^7.0.5"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
+    "@types/express": "^5.0.3",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.3.0",
     "@types/nodemailer": "^7.0.1",
-    "ts-node": "^10.9.2",
-    "jest": "^30.0.5",
-    "@types/jest": "^30.0.0",
-    "prettier": "^3.6.2",
     "@typescript-eslint/eslint-plugin": "^8.40.0",
     "@typescript-eslint/parser": "^8.40.0",
     "eslint": "^9.33.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
-    "@types/express": "^5.0.3"
+    "jest": "^30.0.5",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
   }
 }

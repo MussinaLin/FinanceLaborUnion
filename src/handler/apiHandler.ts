@@ -3,17 +3,20 @@ import { HelloResponse, ApiResponse } from '../types';
 import { CSVService } from '../services/csvService';
 import { EmailService } from '../services/emailService';
 import { GoogleDocsService } from '../services/googleDocsService';
+import { ECPayService } from '../services/ecpayService';
 import config from '../configs';
 
 export class ApiHandler {
   private csvService: CSVService;
   private emailService: EmailService;
   private googleDocsService: GoogleDocsService;
+  private ecPayService: ECPayService;
 
   constructor() {
     this.csvService = new CSVService();
     this.emailService = new EmailService();
     this.googleDocsService = new GoogleDocsService();
+    this.ecPayService = new ECPayService();
   }
 
   /**
@@ -58,6 +61,35 @@ export class ApiHandler {
             // },
           },
         },
+      };
+
+      return this.createResponse(200, response);
+    } catch (error) {
+      console.error('Error in hello handler:', error);
+      return this.createResponse(500, {
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  async handleECPay(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+    try {
+      const paymentForm = this.ecPayService.createPayment({
+        merchantTradeNo: 'MussinaTest0001',
+        totalAmount: 200,
+        tradeDesc: '台灣金融勞權工會-會費繳交',
+        itemName: '會費',
+        returnURL: 'https://your-domain.com/callback',
+        choosePayment: 'ALL',
+      });
+
+      const response: HelloResponse = {
+        success: true,
+        message: 'Hello from AWS Lambda!',
+        timestamp: new Date().toISOString(),
+        version: config.app.version,
+        data: paymentForm,
       };
 
       return this.createResponse(200, response);
@@ -253,6 +285,8 @@ export class ApiHandler {
     switch (event.path) {
       case '/hello':
         return this.handleHello(event);
+      case '/ecpay':
+        return this.handleECPay(event);
 
       //   case '/csv':
       //     return this.handleReadCSV(event);
