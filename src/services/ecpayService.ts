@@ -1,281 +1,97 @@
-// Import the actual module with any type to bypass TypeScript checking
-const ECPayPayment = require('ecpay_aio_nodejs');
-
-// Define types for ECPay
-export type PaymentMethod =
-  | 'ALL'
-  | 'Credit'
-  | 'WebATM'
-  | 'ATM'
-  | 'CVS'
-  | 'BARCODE'
-  | 'AndroidPay'
-  | 'ApplePay'
-  | 'LinePay'
-  | 'JKOPay'
-  | 'EasyWallet'
-  | 'TaiwanPay';
-
-export interface PaymentParams {
-  MerchantID: string;
-  MerchantTradeNo: string;
-  MerchantTradeDate: string;
-  PaymentType: 'aio';
-  TotalAmount: number;
-  TradeDesc: string;
-  ItemName: string;
-  ReturnURL: string;
-  ChoosePayment: PaymentMethod;
-  ClientBackURL?: string;
-  ItemURL?: string;
-  Remark?: string;
-  ChooseSubPayment?: string;
-  OrderResultURL?: string;
-  NeedExtraPaidInfo?: 'Y' | 'N';
-  DeviceSource?: string;
-  IgnorePayment?: string;
-  PlatformID?: string;
-  InvoiceMark?: 'Y' | 'N';
-  CustomField1?: string;
-  CustomField2?: string;
-  CustomField3?: string;
-  CustomField4?: string;
-  EncryptType?: 1;
-}
-
-export interface QueryPaymentParams {
-  MerchantID: string;
-  MerchantTradeNo: string;
-  TimeStamp: number;
-}
-
-export interface TradeInfo {
-  MerchantID: string;
-  MerchantTradeNo: string;
-  TradeNo: string;
-  TradeAmt: number;
-  PaymentDate: string;
-  PaymentType: string;
-  PaymentTypeChargeFee: number;
-  TradeDate: string;
-  CheckMacValue: string;
-}
-
-export interface PaymentResult {
-  CheckMacValue: string;
-  MerchantID: string;
-  MerchantTradeNo: string;
-  PaymentDate: string;
-  PaymentType: string;
-  PaymentTypeChargeFee: string;
-  RtnCode: number;
-  RtnMsg: string;
-  SimulatePaid: string;
-  TradeAmt: string;
-  TradeDate: string;
-  TradeNo: string;
-  CustomField1?: string;
-  CustomField2?: string;
-  CustomField3?: string;
-  CustomField4?: string;
-}
-
-export interface ECPayOptions {
-  OperationMode: 'Test' | 'Production';
-  MercProfile: {
-    MerchantID: string;
-    HashKey: string;
-    HashIV: string;
-  };
-  IgnorePayment?: PaymentMethod[];
-  IsProjectContractor?: boolean;
-}
-
+import * as crypto from 'crypto';
 import config from '../configs';
 
+// Simple types for ECPay
+export type PaymentMethod = 'ALL' | 'Credit' | 'WebATM' | 'ATM' | 'CVS' | 'BARCODE';
+
+export interface CreatePaymentParams {
+  merchantTradeNo: string;
+  totalAmount: number;
+  tradeDesc: string;
+  itemName: string;
+  returnURL: string;
+  clientBackURL?: string;
+  choosePayment?: PaymentMethod;
+}
+
+export interface PaymentCallback {
+  MerchantID: string;
+  MerchantTradeNo: string;
+  TradeNo: string;
+  RtnCode: number;
+  RtnMsg: string;
+  TradeAmt: string;
+  PaymentDate: string;
+  PaymentType: string;
+  CheckMacValue: string;
+}
+
 export class ECPayService {
-  private ecpay: any;
-  private options: ECPayOptions;
+  private merchantId: string;
+  private hashKey: string;
+  private hashIV: string;
+  private apiUrl: string;
 
   constructor() {
-    this.options = {
-      OperationMode: config.ecpay.operationMode,
-      MercProfile: {
-        MerchantID: config.ecpay.merchantId,
-        HashKey: config.ecpay.hashKey,
-        HashIV: config.ecpay.hashIV,
-      },
-      IgnorePayment: [],
-      IsProjectContractor: false,
-    };
+    this.merchantId = config.ecpay.merchantId;
+    this.hashKey = config.ecpay.hashKey;
+    this.hashIV = config.ecpay.hashIV;
 
-    try {
-      this.ecpay = new ECPayPayment(this.options);
-      console.log('✅ ECPay service initialized successfully');
-      console.log(`   Mode: ${this.options.OperationMode}`);
-      console.log(`   Merchant ID: ${this.options.MercProfile.MerchantID}`);
-    } catch (error) {
-      console.error('❌ Failed to initialize ECPay service:', error);
-      throw error;
-    }
+    // Use test or production API URL based on operation mode
+    this.apiUrl =
+      config.ecpay.operationMode === 'Production'
+        ? 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'
+        : 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
+
+    console.log('✅ ECPay service initialized');
+    console.log(`   Mode: ${config.ecpay.operationMode}`);
+    console.log(`   Merchant ID: ${this.merchantId}`);
+    console.log(`   API URL: ${this.apiUrl}`);
   }
 
   /**
-   * Create payment form HTML
+   * Generate CheckMacValue for ECPay API
    */
-  createPayment(params: {
-    merchantTradeNo: string;
-    totalAmount: number;
-    tradeDesc: string;
-    itemName: string;
-    returnURL: string;
-    clientBackURL?: string;
-    choosePayment?: PaymentMethod;
-    customFields?: {
-      field1?: string;
-      field2?: string;
-      field3?: string;
-      field4?: string;
-    };
-  }): string {
-    try {
-      const tradeDate = this.generateTradeDate();
+  private generateCheckMacValue(params: Record<string, any>): string {
+    // Remove CheckMacValue if exists
+    const { CheckMacValue, ...filteredParams } = params;
 
-      const paymentParams: PaymentParams = {
-        MerchantID: this.options.MercProfile.MerchantID,
-        MerchantTradeNo: params.merchantTradeNo,
-        MerchantTradeDate: tradeDate,
-        PaymentType: 'aio',
-        TotalAmount: params.totalAmount,
-        TradeDesc: params.tradeDesc,
-        ItemName: params.itemName,
-        ReturnURL: params.returnURL,
-        ChoosePayment: params.choosePayment || 'ALL',
-        // ClientBackURL: params.clientBackURL,
-        EncryptType: 1,
-        // CustomField1: params.customFields?.field1,
-        // CustomField2: params.customFields?.field2,
-        // CustomField3: params.customFields?.field3,
-        // CustomField4: params.customFields?.field4,
-      };
+    // Sort parameters by key
+    const sortedKeys = Object.keys(filteredParams).sort();
 
-      console.log('🏪 Creating ECPay payment form');
-      // console.log(`   Trade No: ${params.merchantTradeNo}`);
-      // console.log(`   Amount: NT$ ${params.totalAmount}`);
-      // console.log(`   Payment Method: ${params.choosePayment || 'ALL'}`);
-
-      console.log(`paymentParams:${paymentParams}`);
-
-      const paymentForm = this.ecpay.payment_client.aio_check_out_all(paymentParams);
-
-      console.log('✅ Payment form created successfully');
-      return paymentForm;
-    } catch (error) {
-      console.error('❌ Error creating payment form:', error);
-      throw new Error(`Failed to create payment: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Query trade information
-   */
-  async queryTradeInfo(merchantTradeNo: string): Promise<TradeInfo> {
-    try {
-      const queryParams: QueryPaymentParams = {
-        MerchantID: this.options.MercProfile.MerchantID,
-        MerchantTradeNo: merchantTradeNo,
-        TimeStamp: Math.floor(Date.now() / 1000),
-      };
-
-      console.log(`🔍 Querying trade info for: ${merchantTradeNo}`);
-
-      const result = await this.ecpay.query_client.trade_info(queryParams);
-
-      console.log('✅ Trade info retrieved successfully');
-      return result;
-    } catch (error) {
-      console.error('❌ Error querying trade info:', error);
-      throw new Error(`Failed to query trade: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Verify payment callback
-   */
-  verifyPaymentCallback(receivedData: Record<string, any>, receivedCheckMacValue: string): boolean {
-    try {
-      console.log('🔒 Verifying payment callback');
-
-      const isValid = ECPayPayment.verification(
-        receivedCheckMacValue,
-        receivedData,
-        this.options.MercProfile.HashKey,
-        this.options.MercProfile.HashIV,
-      );
-
-      if (isValid) {
-        console.log('✅ Payment callback verification successful');
-      } else {
-        console.log('❌ Payment callback verification failed');
+    // Create query string
+    const queryParts: string[] = [];
+    for (const key of sortedKeys) {
+      const value = filteredParams[key];
+      if (value !== undefined && value !== null && value !== '') {
+        queryParts.push(`${key}=${value}`);
       }
-
-      return isValid;
-    } catch (error) {
-      console.error('❌ Error verifying payment callback:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Process payment result
-   */
-  processPaymentResult(callbackData: PaymentResult): {
-    isSuccess: boolean;
-    tradeNo: string;
-    merchantTradeNo: string;
-    amount: number;
-    paymentDate: string;
-    message: string;
-  } {
-    const isSuccess = callbackData.RtnCode === 1;
-
-    const result = {
-      isSuccess,
-      tradeNo: callbackData.TradeNo,
-      merchantTradeNo: callbackData.MerchantTradeNo,
-      amount: parseInt(callbackData.TradeAmt),
-      paymentDate: callbackData.PaymentDate,
-      message: callbackData.RtnMsg,
-    };
-
-    if (isSuccess) {
-      console.log('✅ Payment completed successfully');
-      console.log(`   Trade No: ${result.tradeNo}`);
-      console.log(`   Amount: NT$ ${result.amount}`);
-    } else {
-      console.log('❌ Payment failed or cancelled');
-      console.log(`   Message: ${result.message}`);
     }
 
-    return result;
+    const queryString = queryParts.join('&');
+
+    // Add HashKey and HashIV
+    const stringToHash = `HashKey=${this.hashKey}&${queryString}&HashIV=${this.hashIV}`;
+    console.log(`checkValue before encode:${stringToHash}`);
+
+    // URL encode
+    const encodedString = encodeURIComponent(stringToHash)
+      .toLowerCase()
+      .replace(/%20/g, '+')
+      .replace(/[!'()*]/g, (c) => {
+        return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+      });
+
+    console.log(`checkValue after encode:${encodedString}`);
+
+    // Generate SHA256 hash and convert to uppercase
+    const hash = crypto.createHash('sha256').update(encodedString).digest('hex').toUpperCase();
+
+    return hash;
   }
 
   /**
-   * Generate unique merchant trade number
-   */
-  generateMerchantTradeNo(prefix?: string): string {
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, '0');
-    const tradeNo = `${prefix || 'T'}${timestamp}${random}`;
-
-    // ECPay限制：交易編號最長20碼
-    return tradeNo.substring(0, 20);
-  }
-
-  /**
-   * Generate trade date in ECPay format
+   * Generate trade date in ECPay format (YYYY/MM/DD HH:mm:ss)
    */
   private generateTradeDate(): string {
     const now = new Date();
@@ -290,34 +106,174 @@ export class ECPayService {
   }
 
   /**
-   * Get available payment methods
+   * Generate unique merchant trade number
    */
-  getPaymentMethods(): PaymentMethod[] {
-    return [
-      'ALL',
-      'Credit',
-      'WebATM',
-      'ATM',
-      'CVS',
-      'BARCODE',
-      'AndroidPay',
-      'ApplePay',
-      'LinePay',
-      'JKOPay',
-      'EasyWallet',
-      'TaiwanPay',
-    ];
+  generateMerchantTradeNo(prefix = 'T'): string {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0');
+    const tradeNo = `${prefix}${timestamp}${random}`;
+
+    // ECPay limitation: max 20 characters
+    return tradeNo.substring(0, 20);
   }
 
   /**
-   * Check if service is properly configured
+   * Create payment form HTML
+   */
+  createPaymentForm(params: CreatePaymentParams): string {
+    try {
+      const tradeDate = this.generateTradeDate();
+
+      // Build payment parameters
+      const paymentParams: Record<string, any> = {
+        MerchantID: this.merchantId,
+        MerchantTradeNo: params.merchantTradeNo,
+        MerchantTradeDate: tradeDate,
+        PaymentType: 'aio',
+        TotalAmount: params.totalAmount,
+        TradeDesc: params.tradeDesc,
+        ItemName: params.itemName,
+        ReturnURL: params.returnURL,
+        ChoosePayment: params.choosePayment || 'ALL',
+        EncryptType: 1,
+      };
+
+      // Add optional parameters
+      if (params.clientBackURL) {
+        paymentParams.ClientBackURL = params.clientBackURL;
+      }
+
+      // Generate CheckMacValue
+      paymentParams.CheckMacValue = this.generateCheckMacValue(paymentParams);
+
+      console.log('🏪 Creating ECPay payment form');
+      console.log(`   Trade No: ${params.merchantTradeNo}`);
+      console.log(`   Amount: NT$ ${params.totalAmount}`);
+      console.log(`   Payment Method: ${params.choosePayment || 'ALL'}`);
+      console.log(`paymentParams:${JSON.stringify(paymentParams, null, 2)}`);
+
+      // Generate HTML form
+      const formFields = Object.entries(paymentParams)
+        .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}">`)
+        .join('\n');
+
+      const html = `
+        <form id="ecpayForm" method="post" action="${this.apiUrl}">
+          ${formFields}
+        </form>
+        <script>
+          document.getElementById('ecpayForm').submit();
+        </script>
+      `;
+
+      console.log('✅ Payment form created successfully');
+      return html;
+    } catch (error) {
+      console.error('❌ Error creating payment form:', error);
+      throw new Error(`Failed to create payment form: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Verify payment callback from ECPay
+   */
+  verifyCallback(callbackData: PaymentCallback): boolean {
+    try {
+      console.log('🔒 Verifying ECPay callback');
+
+      const receivedCheckMac = callbackData.CheckMacValue;
+      const calculatedCheckMac = this.generateCheckMacValue(callbackData);
+
+      const isValid = receivedCheckMac === calculatedCheckMac;
+
+      if (isValid) {
+        console.log('✅ Callback verification successful');
+        console.log(`   Trade No: ${callbackData.TradeNo}`);
+        console.log(`   Merchant Trade No: ${callbackData.MerchantTradeNo}`);
+        console.log(`   Amount: NT$ ${callbackData.TradeAmt}`);
+        console.log(`   Status: ${callbackData.RtnCode === 1 ? 'Success' : 'Failed'}`);
+      } else {
+        console.log('❌ Callback verification failed');
+        console.log(`   Received: ${receivedCheckMac}`);
+        console.log(`   Calculated: ${calculatedCheckMac}`);
+      }
+
+      return isValid;
+    } catch (error) {
+      console.error('❌ Error verifying callback:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Process payment callback result
+   */
+  processCallback(callbackData: PaymentCallback): {
+    isSuccess: boolean;
+    isValid: boolean;
+    tradeNo: string;
+    merchantTradeNo: string;
+    amount: number;
+    paymentDate: string;
+    message: string;
+  } {
+    const isValid = this.verifyCallback(callbackData);
+    const isSuccess = callbackData.RtnCode === 1;
+
+    return {
+      isValid,
+      isSuccess,
+      tradeNo: callbackData.TradeNo,
+      merchantTradeNo: callbackData.MerchantTradeNo,
+      amount: parseInt(callbackData.TradeAmt),
+      paymentDate: callbackData.PaymentDate,
+      message: callbackData.RtnMsg,
+    };
+  }
+
+  /**
+   * Query trade information (requires additional API call setup)
+   */
+  // async queryTradeInfo(merchantTradeNo: string): Promise<any> {
+  //   try {
+  //     const queryParams = {
+  //       MerchantID: this.merchantId,
+  //       MerchantTradeNo: merchantTradeNo,
+  //       TimeStamp: Math.floor(Date.now() / 1000),
+  //     };
+
+  //     queryParams.CheckMacValue = this.generateCheckMacValue(queryParams);
+
+  //     console.log(`🔍 Querying trade info for: ${merchantTradeNo}`);
+
+  //     // Note: This would require implementing HTTP client
+  //     // For now, just return the query parameters
+  //     console.log('ℹ️  Query parameters prepared:', queryParams);
+
+  //     return {
+  //       message: 'Query API not implemented in this simplified version',
+  //       queryParams,
+  //     };
+  //   } catch (error) {
+  //     console.error('❌ Error querying trade info:', error);
+  //     throw new Error(`Failed to query trade: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  //   }
+  // }
+
+  /**
+   * Get available payment methods
+   */
+  getPaymentMethods(): PaymentMethod[] {
+    return ['ALL', 'Credit', 'WebATM', 'ATM', 'CVS', 'BARCODE'];
+  }
+
+  /**
+   * Check if service is configured
    */
   isConfigured(): boolean {
-    return !!(
-      this.options.MercProfile.MerchantID &&
-      this.options.MercProfile.HashKey &&
-      this.options.MercProfile.HashIV
-    );
+    return !!(this.merchantId && this.hashKey && this.hashIV);
   }
 
   /**
@@ -325,11 +281,12 @@ export class ECPayService {
    */
   getConfigInfo(): object {
     return {
-      operationMode: this.options.OperationMode,
-      merchantId: this.options.MercProfile.MerchantID || 'Not configured',
-      hasHashKey: !!this.options.MercProfile.HashKey,
-      hasHashIV: !!this.options.MercProfile.HashIV,
+      operationMode: config.ecpay.operationMode,
+      merchantId: this.merchantId || 'Not configured',
+      hasHashKey: !!this.hashKey,
+      hasHashIV: !!this.hashIV,
       isConfigured: this.isConfigured(),
+      apiUrl: this.apiUrl,
     };
   }
 }

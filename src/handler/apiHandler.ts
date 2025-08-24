@@ -75,10 +75,10 @@ export class ApiHandler {
 
   async handleECPay(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
     try {
-      const paymentForm = this.ecPayService.createPayment({
+      const paymentForm = this.ecPayService.createPaymentForm({
         merchantTradeNo: 'MussinaTest0001',
         totalAmount: 200,
-        tradeDesc: '台灣金融勞權工會-會費繳交',
+        tradeDesc: '台灣金融勞權工會會費繳交',
         itemName: '會費',
         returnURL: 'https://your-domain.com/callback',
         choosePayment: 'ALL',

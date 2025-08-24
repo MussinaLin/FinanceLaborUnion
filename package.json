@@ -21,7 +21,6 @@
     "aws-lambda": "^1.0.7",
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.1",
-    "ecpay_aio_nodejs": "^1.2.2",
     "express": "^5.1.0",
     "googleapis": "^156.0.0",
     "nodemailer": "^7.0.5"
