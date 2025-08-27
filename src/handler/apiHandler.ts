@@ -31,7 +31,7 @@ export class ApiHandler {
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       },
-      body: JSON.stringify(body),
+      body: body,
     };
   }
 
@@ -75,24 +75,56 @@ export class ApiHandler {
 
   async handleECPay(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
     try {
-      const paymentForm = this.ecPayService.createPaymentForm({
-        merchantTradeNo: 'MussinaTest0001',
-        totalAmount: 200,
-        tradeDesc: '台灣金融勞權工會會費繳交',
-        itemName: '會費',
-        returnURL: 'https://your-domain.com/callback',
-        choosePayment: 'ALL',
+      const body = event.body ? JSON.parse(event.body) : {};
+      const { merchantTradeNo, totalAmount, tradeDesc, itemName, returnURL } = body;
+
+      const paymentResult = await this.ecPayService.createPaymentForm({
+        merchantTradeNo: merchantTradeNo,
+        totalAmount: totalAmount,
+        tradeDesc: tradeDesc,
+        itemName: itemName,
+        returnURL: returnURL,
       });
 
-      const response: HelloResponse = {
+      // Extract ECPay payment URL and parameters from the generated form
+      // const paymentUrl = this.ecPayService.extractPaymentUrl(paymentResult.redirectUrl);
+
+      const response: ApiResponse = {
         success: true,
-        message: 'Hello from AWS Lambda!',
-        timestamp: new Date().toISOString(),
-        version: config.app.version,
-        data: paymentForm,
+        message: 'Payment created successfully. Redirect user to payment URL.',
+        data: paymentResult.redirectUrl,
+        // data: {
+        //   redirectUrl: paymentResult.redirectUrl,
+        //   tradeNo: paymentResult.tradeNo,
+        //   totalAmount,
+        //   instructions: 'Redirect the user to redirectUrl to complete payment',
+        // },
       };
 
       return this.createResponse(200, response);
+    } catch (error) {
+      console.error('Error in hello handler:', error);
+      return this.createResponse(500, {
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  async handlePayment(merchantTradeNo: string): Promise<APIGatewayProxyResult> {
+    try {
+      // const body = event.body ? JSON.parse(event.body) : {};
+      // const { merchantTradeNo, totalAmount, tradeDesc, itemName, returnURL } = body;
+
+      const paymentResult = await this.ecPayService.createPaymentForm({
+        merchantTradeNo: merchantTradeNo,
+        totalAmount: 200,
+        tradeDesc: '台灣金融勞權工會',
+        itemName: '會費',
+        returnURL: 'https://www.ecpay.com.tw/receive.php',
+      });
+
+      return this.createResponse(200, paymentResult.redirectUrl);
     } catch (error) {
       console.error('Error in hello handler:', error);
       return this.createResponse(500, {
@@ -279,6 +311,14 @@ export class ApiHandler {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
       return this.createResponse(200, {});
+    }
+
+    if (event.path.startsWith('/payment/')) {
+      const merchantTradeNo = event.pathParameters?.MerchantTradeNo;
+      console.log(`merchantTradeNo:${merchantTradeNo}`);
+      if (merchantTradeNo) {
+        return this.handlePayment(merchantTradeNo);
+      }
     }
 
     // Route to appropriate handler

@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  MyLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Events:
+        PaymentApi:
+          Type: Api
+          Properties:
+            Path: /payment/{MerchantTradeNo}
+            Method: get
+        HelloApi:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: get
+        # 其他 API endpoints...
+
+Outputs:
+  ApiGatewayEndpoint:
+    Description: 'API Gateway endpoint URL'
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/'

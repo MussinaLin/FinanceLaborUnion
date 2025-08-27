@@ -91,6 +91,52 @@ export class ECPayService {
   }
 
   /**
+   * Generate CheckMacValue for ECPay API
+   * @param data - Payment parameters object
+   * @param hashKey - ECPay HashKey
+   * @param hashIV - ECPay HashIV
+   * @returns CheckMacValue string
+   */
+  private generateCheckMacValueGit = (data: Record<string, any>): string => {
+    // Sort object keys alphabetically
+    const keys = Object.keys(data).sort();
+
+    let checkValue = '';
+
+    // Build query string from sorted parameters
+    for (const key of keys) {
+      checkValue += `${key}=${data[key]}&`;
+    }
+
+    // Add HashKey and HashIV
+    checkValue = `HashKey=${this.hashKey}&${checkValue}HashIV=${this.hashIV}`;
+
+    // URL encode and convert to lowercase
+    checkValue = encodeURIComponent(checkValue).toLowerCase();
+
+    // Replace specific encoded characters according to ECPay specification
+    checkValue = checkValue
+      .replace(/%20/g, '+') // Space
+      .replace(/%2d/g, '-') // Hyphen
+      .replace(/%5f/g, '_') // Underscore
+      .replace(/%2e/g, '.') // Period
+      .replace(/%21/g, '!') // Exclamation mark
+      .replace(/%2a/g, '*') // Asterisk
+      .replace(/%28/g, '(') // Left parenthesis
+      .replace(/%29/g, ')') // Right parenthesis
+      .replace(/%20/g, '+'); // Space (duplicate, but keeping as in original)
+
+    console.log(`checkValue:${checkValue}`);
+    // Generate SHA256 hash
+    checkValue = crypto.createHash('sha256').update(checkValue).digest('hex');
+
+    // Convert to uppercase
+    checkValue = checkValue.toUpperCase();
+
+    return checkValue;
+  };
+
+  /**
    * Generate trade date in ECPay format (YYYY/MM/DD HH:mm:ss)
    */
   private generateTradeDate(): string {
@@ -122,12 +168,96 @@ export class ECPayService {
   /**
    * Create payment form HTML
    */
-  createPaymentForm(params: CreatePaymentParams): string {
+  // async createPaymentForm(params: CreatePaymentParams): Promise<{ redirectUrl: string; tradeNo: string }> {
+  //   try {
+  //     const tradeDate = this.generateTradeDate();
+
+  //     // Build payment parameters
+  //     const paymentParams = new URLSearchParams();
+  //     paymentParams.append('MerchantID', this.merchantId);
+  //     paymentParams.append('MerchantTradeNo', params.merchantTradeNo);
+  //     paymentParams.append('MerchantTradeDate', tradeDate);
+  //     paymentParams.append('PaymentType', 'aio');
+  //     paymentParams.append('TotalAmount', params.totalAmount.toString());
+  //     paymentParams.append('TradeDesc', params.tradeDesc);
+  //     paymentParams.append('ItemName', params.itemName);
+  //     paymentParams.append('ReturnURL', params.returnURL);
+  //     paymentParams.append('ChoosePayment', 'ALL');
+  //     paymentParams.append('EncryptType', '1');
+
+  //     const paymentParams2: Record<string, any> = {
+  //       MerchantID: this.merchantId,
+  //       MerchantTradeNo: params.merchantTradeNo,
+  //       MerchantTradeDate: tradeDate,
+  //       PaymentType: 'aio',
+  //       TotalAmount: params.totalAmount,
+  //       TradeDesc: params.tradeDesc,
+  //       ItemName: params.itemName,
+  //       ReturnURL: params.returnURL,
+  //       ChoosePayment: 'ALL',
+  //       EncryptType: 1,
+  //     };
+
+  //     // Generate CheckMacValue
+
+  //     paymentParams.append('CheckMacValue', this.generateCheckMacValueGit(paymentParams2));
+  //     paymentParams2.CheckMacValue = this.generateCheckMacValueGit(paymentParams2);
+
+  //     console.log('🏪 Creating ECPay payment form');
+  //     console.log(`paymentParams:${JSON.stringify(paymentParams2, null, 2)}`);
+
+  //     // Call ECPay API
+  //     const response = await fetch(this.apiUrl, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/x-www-form-urlencoded',
+  //       },
+  //       body: paymentParams.toString(),
+  //     });
+
+  //     console.log(`response.ok:${response.ok}`);
+  //     if (!response.ok) {
+  //       throw new Error(`ECPay API error: ${response.status} ${response.statusText}`);
+  //     }
+
+  //     const result = await response.text();
+
+  //     // console.log('-------------');
+  //     // console.log(JSON.stringify(result, null, 2));
+  //     // console.log('-------------');
+
+  //     // ECPay returns HTML with redirect, extract the redirect URL
+  //     // const redirectUrl = this.extractRedirectUrl(result);
+
+  //     console.log('✅ Payment created successfully');
+  //     return {
+  //       redirectUrl: result,
+  //       tradeNo: params.merchantTradeNo,
+  //     };
+  //   } catch (error) {
+  //     console.error('❌ Error creating payment:', error);
+  //     throw new Error(`Failed to create payment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  //   }
+  // }
+
+  async createPaymentForm(params: CreatePaymentParams): Promise<{ redirectUrl: string; tradeNo: string }> {
     try {
       const tradeDate = this.generateTradeDate();
 
       // Build payment parameters
-      const paymentParams: Record<string, any> = {
+      const paymentParams = new URLSearchParams();
+      paymentParams.append('MerchantID', this.merchantId);
+      paymentParams.append('MerchantTradeNo', params.merchantTradeNo);
+      paymentParams.append('MerchantTradeDate', tradeDate);
+      paymentParams.append('PaymentType', 'aio');
+      paymentParams.append('TotalAmount', params.totalAmount.toString());
+      paymentParams.append('TradeDesc', params.tradeDesc);
+      paymentParams.append('ItemName', params.itemName);
+      paymentParams.append('ReturnURL', params.returnURL);
+      paymentParams.append('ChoosePayment', 'ALL');
+      paymentParams.append('EncryptType', '1');
+
+      const paymentParams2: Record<string, any> = {
         MerchantID: this.merchantId,
         MerchantTradeNo: params.merchantTradeNo,
         MerchantTradeDate: tradeDate,
@@ -136,44 +266,100 @@ export class ECPayService {
         TradeDesc: params.tradeDesc,
         ItemName: params.itemName,
         ReturnURL: params.returnURL,
-        ChoosePayment: params.choosePayment || 'ALL',
+        ChoosePayment: 'ALL',
         EncryptType: 1,
       };
 
-      // Add optional parameters
-      if (params.clientBackURL) {
-        paymentParams.ClientBackURL = params.clientBackURL;
-      }
-
       // Generate CheckMacValue
-      paymentParams.CheckMacValue = this.generateCheckMacValue(paymentParams);
+      const checkMacValue = this.generateCheckMacValueGit(paymentParams2);
+      paymentParams.append('CheckMacValue', checkMacValue);
+      paymentParams2.CheckMacValue = checkMacValue;
 
       console.log('🏪 Creating ECPay payment form');
-      console.log(`   Trade No: ${params.merchantTradeNo}`);
-      console.log(`   Amount: NT$ ${params.totalAmount}`);
-      console.log(`   Payment Method: ${params.choosePayment || 'ALL'}`);
-      console.log(`paymentParams:${JSON.stringify(paymentParams, null, 2)}`);
-
-      // Generate HTML form
-      const formFields = Object.entries(paymentParams)
-        .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}">`)
-        .join('\n');
+      console.log(`paymentParams:${JSON.stringify(paymentParams2, null, 2)}`);
 
       const html = `
-        <form id="ecpayForm" method="post" action="${this.apiUrl}">
-          ${formFields}
-        </form>
-        <script>
-          document.getElementById('ecpayForm').submit();
-        </script>
-      `;
+  <html>
+  <head></head>
+  <body>
+  <form id="paymentForm" target="_blank" method="post" action="${this.apiUrl}">
+  <input type="text" name="ChoosePayment" value="ALL"><br>
+  <input type="text" name="EncryptType" value="1"><br>
+  <input type="text" name="ItemName" value=${params.itemName}><br>
+  <input type="text" name="MerchantID" value=${this.merchantId}><br>
+  <input type="text" name="MerchantTradeDate" value=${tradeDate}><br>
+  <input type="text" name="MerchantTradeNo" value=${params.merchantTradeNo}><br>
+  <input type="text" name="PaymentType" value="aio"><br>
+  <input type="text" name="ReturnURL" value="https://www.ecpay.com.tw/receive.php"><br>
+  <input type="text" name="TotalAmount" value=${params.totalAmount}><br>
+  <input type="text" name="TradeDesc" value=${params.tradeDesc}><br>
+  <input type="text" name="CheckMacValue" value=${checkMacValue}>
+  </form>
+  <script>
+      window.onload = function() {
+      document.getElementById('paymentForm').submit();
+    };
+  </script>
+  </body>
+  </html>  `;
 
-      console.log('✅ Payment form created successfully');
-      return html;
+      console.log('✅ Payment created successfully');
+      return {
+        redirectUrl: html,
+        tradeNo: params.merchantTradeNo,
+      };
     } catch (error) {
-      console.error('❌ Error creating payment form:', error);
-      throw new Error(`Failed to create payment form: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('❌ Error creating payment:', error);
+      throw new Error(`Failed to create payment: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Extract payment URL with parameters from HTML form
+   */
+  extractPaymentUrl(html: string): string {
+    try {
+      // Extract form action URL
+      const actionMatch = html.match(/action="([^"]+)"/);
+      const actionUrl = actionMatch?.[1] || this.apiUrl;
+
+      // Extract all hidden input fields
+      const inputMatches = html.matchAll(/<input[^>]+name="([^"]*)"[^>]+value="([^"]*)"/g);
+      // const params = new URLSearchParams();
+      let params: string = '';
+
+      for (const match of inputMatches) {
+        const name = match[1];
+        // const value = decodeURIComponent(match[2]); // Decode the value
+        // params.append(name, value);
+        params = params.concat(match[1] + '/' + match[2]);
+      }
+
+      // Combine URL and parameters
+      // const paymentUrl = `${actionUrl}?${params.toString()}`;
+      const paymentUrl = params.toString();
+
+      console.log('✅ Payment URL extracted successfully');
+      return paymentUrl;
+    } catch (error) {
+      console.error('❌ Error extracting payment URL:', error);
+      // Fallback: return API URL (user will need to manually submit form)
+      return this.apiUrl;
+    }
+  }
+
+  /**
+   * Extract redirect URL from ECPay response (if needed)
+   */
+  private extractRedirectUrl(html: string): string {
+    // ECPay might return HTML with form or redirect
+    const formMatch = html.match(/action="([^"]+)"/);
+    // const redirectMatch = html.match(/location\.href\s*=\s*["']([^"']+)["']/);
+
+    // return formMatch?.[1] || redirectMatch?.[1];
+
+    if (formMatch == null) throw new Error("Can't find ECPay redirectUrl...");
+    return formMatch[1];
   }
 
   /**
