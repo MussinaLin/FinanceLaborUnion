@@ -96,14 +96,14 @@ if (require.main === module) {
     const result = await handler(event, context);
 
     // Set status code
-    res.status(result.statusCode);
+    // res.status(result.statusCode);
 
     // Set headers
-    if (result.headers) {
-      Object.entries(result.headers).forEach(([key, value]) => {
-        res.set(key, value as string);
-      });
-    }
+    // if (result.headers) {
+    //   Object.entries(result.headers).forEach(([key, value]) => {
+    //     res.set(key, value as string);
+    //   });
+    // }
 
     // Send response
     if (result.body) {

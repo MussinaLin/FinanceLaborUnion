@@ -279,29 +279,44 @@ export class ECPayService {
       console.log(`paymentParams:${JSON.stringify(paymentParams2, null, 2)}`);
 
       const html = `
-  <html>
-  <head></head>
-  <body>
-  <form id="paymentForm" target="_blank" method="post" action="${this.apiUrl}">
-  <input type="text" name="ChoosePayment" value="ALL"><br>
-  <input type="text" name="EncryptType" value="1"><br>
-  <input type="text" name="ItemName" value=${params.itemName}><br>
-  <input type="text" name="MerchantID" value=${this.merchantId}><br>
-  <input type="text" name="MerchantTradeDate" value=${tradeDate}><br>
-  <input type="text" name="MerchantTradeNo" value=${params.merchantTradeNo}><br>
-  <input type="text" name="PaymentType" value="aio"><br>
-  <input type="text" name="ReturnURL" value="https://www.ecpay.com.tw/receive.php"><br>
-  <input type="text" name="TotalAmount" value=${params.totalAmount}><br>
-  <input type="text" name="TradeDesc" value=${params.tradeDesc}><br>
-  <input type="text" name="CheckMacValue" value=${checkMacValue}>
-  </form>
-  <script>
-      window.onload = function() {
-      document.getElementById('paymentForm').submit();
-    };
-  </script>
-  </body>
-  </html>  `;
+      <!DOCTYPE html>
+<html>
+   <head>
+      <meta charset="UTF-8">
+      <title>重導向到付款頁面...</title>
+   </head>
+   <body>
+      <div style="text-align: center; padding: 20px;">
+         <h3>正在重導向到付款頁面...</h3>
+         <p>請稍候...</p>
+      </div>
+      <form id="paymentForm" target="_blank" method="post" action="${this.apiUrl}">
+         <input type="text" name="ChoosePayment" value="ALL"><br>
+         <input type="text" name="EncryptType" value="1"><br>
+         <input type="text" name="ItemName" value="${params.itemName}"><br>
+         <input type="text" name="MerchantID" value="${this.merchantId}"><br>
+         <input type="text" name="MerchantTradeDate" value="${tradeDate}"><br>
+         <input type="text" name="MerchantTradeNo" value="${params.merchantTradeNo}"><br>
+         <input type="text" name="PaymentType" value="aio"><br>
+         <input type="text" name="ReturnURL" value="https://www.ecpay.com.tw/receive.php"><br>
+         <input type="text" name="TotalAmount" value="${params.totalAmount}"><br>
+         <input type="text" name="TradeDesc" value="${params.tradeDesc}"><br>
+         <input type="text" name="CheckMacValue" value="${checkMacValue}">
+         <div style="text-align: center; margin-top: 20px;">
+            <input type="submit" value="如果沒有自動跳轉，請點擊這裡" style="padding: 10px 20px; font-size: 16px;">
+         </div>
+      </form>
+      <script>
+         window.onload = function() {
+         console.log('Page loaded, submitting form...');
+         setTimeout(function() {
+           document.getElementById('paymentForm').submit();
+         }, 1000);
+         };
+      </script>
+   </body>
+</html>
+   `;
 
       console.log('✅ Payment created successfully');
       return {
