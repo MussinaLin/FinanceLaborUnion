@@ -149,61 +149,37 @@ if (require.main === module) {
       pathParameters: null,
       stageVariables: null,
       requestContext: {
-        requestId: `local-${Date.now()}-${Math.random()}`,
-        stage: 'local',
-        httpMethod: req.method,
-        path: req.path,
-        protocol: 'HTTP/1.1',
-        requestTime: new Date().toISOString(),
-        requestTimeEpoch: Date.now(),
-        identity: {
-          sourceIp: req.ip || '127.0.0.1',
-          userAgent: req.get('User-Agent') || '',
-        },
-        domainName: req.get('host') || 'localhost',
-        apiId: 'local',
+        // requestId: `local-${Date.now()}-${Math.random()}`,
+        // stage: 'local',
+        // httpMethod: req.method,
+        // path: req.path,
+        // protocol: 'HTTP/1.1',
+        // requestTime: new Date().toISOString(),
+        // requestTimeEpoch: Date.now(),
+        // identity: {
+        //   sourceIp: req.ip || '127.0.0.1',
+        //   userAgent: req.get('User-Agent') || '',
+        // },
+        // domainName: req.get('host') || 'localhost',
+        // apiId: 'local',
       } as any,
       resource: req.path,
       multiValueHeaders: {},
       multiValueQueryStringParameters: null,
     };
 
-    const context: Context = {
-      awsRequestId: `local-${Date.now()}`,
-      callbackWaitsForEmptyEventLoop: false,
-      functionName: 'local-dev',
-      functionVersion: '1.0.0',
-      invokedFunctionArn: '',
-      memoryLimitInMB: '256',
-      logGroupName: '',
-      logStreamName: '',
-      getRemainingTimeInMillis: () => 30000,
-      done: () => {},
-      fail: () => {},
-      succeed: () => {},
-    };
-
     try {
-      const result = await handler(event, context);
-
-      // Set status code
-      res.status(result.statusCode);
-
-      // Set headers
-      if (result.headers) {
-        Object.entries(result.headers).forEach(([key, value]) => {
-          res.set(key, value as string);
-        });
-      }
+      const result = await handler(event, {} as Context);
 
       // Send response
       if (result.body) {
         try {
           // Try to parse as JSON for pretty printing in development
           const jsonBody = JSON.parse(result.body);
+
           res.json(jsonBody);
         } catch {
-          // If not JSON, send as text
+          console.log('Not a json, send as text');
           res.send(result.body);
         }
       } else {

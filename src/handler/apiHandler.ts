@@ -377,6 +377,17 @@ export class ApiHandler {
           message: 'merchantTradeNo not found',
         });
       }
+    } else if (event.path.startsWith('/payment/link')) {
+      const merchantTradeNo = event.queryStringParameters?.MerchantTradeNo;
+      console.log(`/payment/link merchantTradeNo:${merchantTradeNo}`);
+      if (merchantTradeNo) {
+        return this.handlePayment(merchantTradeNo);
+      } else {
+        return this.createResponse(404, {
+          success: false,
+          message: 'merchantTradeNo not found',
+        });
+      }
     }
 
     return this.createResponse(404, {
