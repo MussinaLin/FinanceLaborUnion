@@ -134,6 +134,25 @@ export class ApiHandler {
     }
   }
 
+  async handleQueryECPay(merchantTradeNo: string): Promise<APIGatewayProxyResult> {
+    const info = await this.ecPayService.queryECPay(merchantTradeNo);
+
+    if (info.TradeStatus === '1') {
+      // succ
+      return this.createResponse(200, {
+        success: true,
+        data: info,
+      });
+    } else {
+      console.error('Error in queryECPay. Resp:');
+      console.error(JSON.stringify(info, null, 2));
+      return this.createResponse(400, {
+        success: false,
+        message: 'queryECPay api error',
+      });
+    }
+  }
+
   /**
    * CSV reading endpoint handler
    */
@@ -344,5 +363,25 @@ export class ApiHandler {
           message: 'Endpoint not found',
         });
     }
+  }
+
+  async handleGetMethod(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+    if (event.path.startsWith('/payment/details')) {
+      const merchantTradeNo = event.queryStringParameters?.MerchantTradeNo;
+      console.log(`get merchantTradeNo:${merchantTradeNo}`);
+      if (merchantTradeNo) {
+        return this.handleQueryECPay(merchantTradeNo);
+      } else {
+        return this.createResponse(404, {
+          success: false,
+          message: 'merchantTradeNo not found',
+        });
+      }
+    }
+
+    return this.createResponse(404, {
+      success: false,
+      message: 'path not found',
+    });
   }
 }
