@@ -30,6 +30,7 @@ export class ECPayService {
     console.log(`   Mode: ${config.ecpay.operationMode}`);
     console.log(`   Merchant ID: ${this.merchantId}`);
     console.log(`   API URL: ${this.apiUrl}`);
+    console.log(`   Query API URL: ${this.queryApiUrl}`);
   }
 
   /**

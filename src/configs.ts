@@ -29,11 +29,13 @@ export const config = {
 
   ecpay: {
     operationMode: (process.env.ECPAY_OPERATION_MODE as 'Test' | 'Production') || 'Test',
-    merchantId: process.env.ECPAY_MERCHANT_ID || '',
-    hashKey: process.env.ECPAY_HASH_KEY || '',
-    hashIV: process.env.ECPAY_HASH_IV || '',
+    merchantId: process.env.ECPAY_MERCHANT_ID!,
+    hashKey: process.env.ECPAY_HASH_KEY!,
+    hashIV: process.env.ECPAY_HASH_IV!,
     returnURL: process.env.ECPAY_RETURN_URL || '',
-    clientBackURL: process.env.ECPAY_CLIENT_BACK_URL || '',
+    totalAmount: process.env.ECPAY_PAYMENT_LINK_TOTAL_AMOUNT!,
+    tradeDesc: process.env.ECPAY_PAYMENT_LINK_TRADE_DESC!,
+    itemName: process.env.ECPAY_PAYMENT_LINK_ITEM_NAME!,
   },
 };
 

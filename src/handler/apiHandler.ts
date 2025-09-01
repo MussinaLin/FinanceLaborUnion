@@ -113,20 +113,16 @@ export class ApiHandler {
 
   async handlePayment(merchantTradeNo: string): Promise<APIGatewayProxyResult> {
     try {
-      // const body = event.body ? JSON.parse(event.body) : {};
-      // const { merchantTradeNo, totalAmount, tradeDesc, itemName, returnURL } = body;
-
       const paymentResult = await this.ecPayService.createPaymentForm({
         merchantTradeNo: merchantTradeNo,
-        totalAmount: 200,
-        tradeDesc: '台灣金融勞權工會',
-        itemName: '會費',
-        returnURL: 'https://www.ecpay.com.tw/receive.php',
+        totalAmount: Number(config.ecpay.totalAmount),
+        tradeDesc: config.ecpay.tradeDesc,
+        itemName: config.ecpay.itemName,
+        returnURL: config.ecpay.returnURL,
       });
 
       return this.createResponse(200, paymentResult.redirectUrl);
     } catch (error) {
-      console.error('Error in hello handler:', error);
       return this.createResponse(500, {
         success: false,
         message: 'Internal server error',
@@ -367,8 +363,9 @@ export class ApiHandler {
 
   async handleGetMethod(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
     if (event.path.startsWith('/payment/details')) {
+      // get order details
       const merchantTradeNo = event.queryStringParameters?.MerchantTradeNo;
-      console.log(`get merchantTradeNo:${merchantTradeNo}`);
+      console.log(`merchantTradeNo:${merchantTradeNo}`);
       if (merchantTradeNo) {
         return this.handleQueryECPay(merchantTradeNo);
       } else {
@@ -378,8 +375,9 @@ export class ApiHandler {
         });
       }
     } else if (event.path.startsWith('/payment/link')) {
+      // gen payment link
       const merchantTradeNo = event.queryStringParameters?.MerchantTradeNo;
-      console.log(`/payment/link merchantTradeNo:${merchantTradeNo}`);
+      console.log(`merchantTradeNo:${merchantTradeNo}`);
       if (merchantTradeNo) {
         return this.handlePayment(merchantTradeNo);
       } else {
