@@ -20,6 +20,12 @@ export const config = {
     scopes: ['https://www.googleapis.com/auth/documents.readonly'],
   },
 
+  googleSheet: {
+    spreadsheetId: process.env.GOOGLE_SHEET_SPREEDSHEET_ID!,
+    privateKey: process.env.GOOGLE_SHEET_SERVICE_PK!,
+    clientEmail: process.env.GOOGLE_SHEET_CLIENT_EMAIL!,
+  },
+
   // Application configuration
   app: {
     name: 'AWS Lambda API',

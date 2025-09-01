@@ -2,20 +2,24 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { HelloResponse, ApiResponse } from '../types';
 import { CSVService } from '../services/csvService';
 import { EmailService } from '../services/emailService';
-import { GoogleDocsService } from '../services/googleDocsService';
+import { GoogleSheetsService } from '../services/googleSheetService';
 import { ECPayService } from '../services/ecpayService';
 import config from '../configs';
 
 export class ApiHandler {
-  private csvService: CSVService;
   private emailService: EmailService;
-  private googleDocsService: GoogleDocsService;
+  private googleSheetService: GoogleSheetsService;
   private ecPayService: ECPayService;
 
   constructor() {
-    this.csvService = new CSVService();
+    // this.csvService = new CSVService();
     this.emailService = new EmailService();
-    this.googleDocsService = new GoogleDocsService();
+    // console.log(config.googleSheet.spreadsheetId);
+    // console.log(config.googleSheet.privateKey);
+    this.googleSheetService = new GoogleSheetsService(config.googleSheet.spreadsheetId, {
+      clientEmail: config.googleSheet.clientEmail,
+      privateKey: config.googleSheet.privateKey,
+    });
     this.ecPayService = new ECPayService();
   }
 
@@ -149,6 +153,14 @@ export class ApiHandler {
     }
   }
 
+  async generatePaymentLink(): Promise<APIGatewayProxyResult> {
+    await this.googleSheetService.generatePaymentLinks();
+    return this.createResponse(200, {
+      success: true,
+      data: '',
+    });
+  }
+
   /**
    * CSV reading endpoint handler
    */
@@ -268,52 +280,6 @@ export class ApiHandler {
   }
 
   /**
-   * Google Docs reading endpoint handler
-   */
-  async handleReadGoogleDocs(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-    try {
-      if (!this.googleDocsService.isAvailable()) {
-        return this.createResponse(503, {
-          success: false,
-          message: 'Google Docs service not available. Please check credentials configuration.',
-        });
-      }
-
-      const body = event.body ? JSON.parse(event.body) : {};
-      const { documentId, asStructuredData } = body;
-
-      if (!documentId) {
-        return this.createResponse(400, {
-          success: false,
-          message: 'Please provide documentId',
-        });
-      }
-
-      let data: any;
-
-      if (asStructuredData) {
-        data = await this.googleDocsService.readDocumentAsStructuredData(documentId);
-      } else {
-        data = await this.googleDocsService.readDocument(documentId);
-      }
-
-      const response: ApiResponse = {
-        success: true,
-        message: 'Google Docs content retrieved successfully',
-        data,
-      };
-
-      return this.createResponse(200, response);
-    } catch (error) {
-      console.error('Error reading Google Docs:', error);
-      return this.createResponse(500, {
-        success: false,
-        message: error instanceof Error ? error.message : 'Failed to read Google Docs',
-      });
-    }
-  }
-
-  /**
    * Route handling
    */
   async handleRequest(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
@@ -328,13 +294,13 @@ export class ApiHandler {
       return this.createResponse(200, {});
     }
 
-    if (event.path.startsWith('/payment/')) {
-      const merchantTradeNo = event.pathParameters?.MerchantTradeNo;
-      console.log(`merchantTradeNo:${merchantTradeNo}`);
-      if (merchantTradeNo) {
-        return this.handlePayment(merchantTradeNo);
-      }
-    }
+    // if (event.path.startsWith('/payment/')) {
+    //   const merchantTradeNo = event.pathParameters?.MerchantTradeNo;
+    //   console.log(`merchantTradeNo:${merchantTradeNo}`);
+    //   if (merchantTradeNo) {
+    //     return this.handlePayment(merchantTradeNo);
+    //   }
+    // }
 
     // Route to appropriate handler
     switch (event.path) {
@@ -342,16 +308,12 @@ export class ApiHandler {
         return this.handleHello(event);
       case '/ecpay':
         return this.handleECPay(event);
-
-      //   case '/csv':
-      //     return this.handleReadCSV(event);
+      case '/payment/link':
+        return this.generatePaymentLink();
 
       case '/email':
       case '/email/batch':
         return this.handleSendEmail(event);
-
-      case '/docs':
-        return this.handleReadGoogleDocs(event);
 
       default:
         return this.createResponse(404, {
