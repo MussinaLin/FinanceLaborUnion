@@ -1,6 +1,9 @@
 import { EmailConfig } from './types';
 import * as dotenv from 'dotenv';
+import { readFileSync } from 'fs';
+
 dotenv.config();
+const googleServiceAccountKey = JSON.parse(readFileSync('./twfinancelaborunion-7e56bfe6d2f4.json', 'utf8'));
 
 export const config = {
   // Gmail SMTP configuration
@@ -22,8 +25,8 @@ export const config = {
 
   googleSheet: {
     spreadsheetId: process.env.GOOGLE_SHEET_SPREEDSHEET_ID!,
-    privateKey: process.env.GOOGLE_SHEET_SERVICE_PK!,
-    clientEmail: process.env.GOOGLE_SHEET_CLIENT_EMAIL!,
+    privateKey: googleServiceAccountKey.private_key,
+    clientEmail: googleServiceAccountKey.client_email,
   },
 
   // Application configuration
