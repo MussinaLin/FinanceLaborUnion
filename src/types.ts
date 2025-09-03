@@ -18,6 +18,16 @@ export interface EmailOptions {
   }>;
 }
 
+export interface BatchEmailSentData {
+  to: string;
+  subject: string;
+  text: string;
+  attachments?: Array<{
+    filename: string;
+    content: string | Buffer;
+  }>;
+}
+
 export interface BatchEmailResult {
   totalEmails: number;
   successCount: number;

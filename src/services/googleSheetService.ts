@@ -9,8 +9,11 @@ interface MemberData {
 
 interface PaymentRecord {
   member_id: string;
+  member_email: string;
   payment_link: string;
+  unique_payment_link: string;
   paid: string;
+  paid_date: string;
 }
 
 export class GoogleSheetsService {
@@ -54,8 +57,11 @@ export class GoogleSheetsService {
 
         await this.addPaymentRecord(monthlySheet, {
           member_id: member.member_id,
+          member_email: member.member_email,
           payment_link: paymentLink,
+          unique_payment_link: '', // Leave blank
           paid: '', // Leave blank
+          paid_date: '', // Leave blank
         });
 
         console.log(`Generated payment link for ${member.member_id}: ${paymentLink}`);
@@ -66,6 +72,28 @@ export class GoogleSheetsService {
       console.error('❌ Error generating payment links:', error);
       throw error;
     }
+  }
+
+  /**
+   * Read all members from yyyymm sheet
+   */
+  public async getAllPaymentDatas(sheetName: string): Promise<PaymentRecord[]> {
+    const sheet = this.doc.sheetsByTitle[sheetName];
+    if (!sheet) {
+      throw new Error(`sheet:${sheetName} not found`);
+    }
+
+    const rows = await sheet.getRows();
+    return rows
+      .map((row) => ({
+        member_id: row.get('member_id') || '',
+        member_email: row.get('member_email') || '',
+        payment_link: row.get('payment_link') || '',
+        unique_payment_link: row.get('unique_payment_link') || '',
+        paid: row.get('paid') || '',
+        paid_date: row.get('paid_date') || '',
+      }))
+      .filter((member) => member.member_id && member.member_email);
   }
 
   /**
@@ -96,7 +124,7 @@ export class GoogleSheetsService {
       // Create new sheet with headers
       sheet = await this.doc.addSheet({
         title: yyyymm,
-        headerValues: ['member_id', 'payment_link', 'paid', 'paid_date'],
+        headerValues: ['member_id', 'member_email', 'payment_link', 'unique_payment_link', 'paid', 'paid_date'],
       });
       console.log(`Created new sheet: ${yyyymm}`);
     }
@@ -110,9 +138,11 @@ export class GoogleSheetsService {
   private async addPaymentRecord(sheet: GoogleSpreadsheetWorksheet, record: PaymentRecord): Promise<void> {
     await sheet.addRow({
       member_id: record.member_id,
+      member_email: record.member_email,
       payment_link: record.payment_link,
+      unique_payment_link: record.unique_payment_link,
       paid: record.paid,
-      paid_date: '', // Leave blank
+      paid_date: record.paid_date,
     });
   }
 

@@ -17,6 +17,11 @@ export const config = {
     },
   } as EmailConfig,
 
+  mail: {
+    subject: process.env.EMAIL_SUBJECT!,
+    paymentPath: process.env.EMAIL_PAYMENT_URL_PATH!,
+  },
+
   // Google API configuration
   google: {
     credentialsPath: process.env.GOOGLE_CREDENTIALS_PATH || '',

@@ -1,5 +1,5 @@
 import * as nodemailer from 'nodemailer';
-import { EmailConfig, EmailOptions, BatchEmailResult } from '../types';
+import { EmailConfig, EmailOptions, BatchEmailResult, BatchEmailSentData } from '../types';
 import config from '../configs';
 
 export class EmailService {
@@ -159,6 +159,98 @@ export class EmailService {
 
       const result: BatchEmailResult = {
         totalEmails: to.length,
+        successCount,
+        failureCount,
+        results,
+      };
+
+      console.log(`📊 Batch email send completed:`);
+      console.log(`   Total: ${result.totalEmails}, Success: ${result.successCount}, Failed: ${result.failureCount}`);
+
+      return result;
+    } catch (error) {
+      console.error('❌ Error in batch email send:', error);
+      throw new Error(`Failed to send batch emails: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async sendEmailBatch(
+    datas: BatchEmailSentData[],
+    batchSize: number = 5,
+    delayMs: number = 4000,
+  ): Promise<BatchEmailResult> {
+    try {
+      // Check connection before sending
+      if (!this.isConnectionVerified) {
+        console.warn('⚠️  Email connection not verified. Attempting to send anyway...');
+      }
+
+      // Verify transporter configuration before sending
+      await this.transporter.verify();
+      console.log('📧 SMTP server connection verified for sending');
+
+      const results: BatchEmailResult['results'] = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      console.log(`📬 Starting batch email send to ${datas.length} recipients`);
+      console.log(`   Batch size: ${batchSize}, Delay: ${delayMs}ms`);
+
+      // Process emails in batches
+      for (let i = 0; i < datas.length; i += batchSize) {
+        const batch = datas.slice(i, i + batchSize);
+        console.log(
+          `📤 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(datas.length / batchSize)} (${batch.length} emails)`,
+        );
+
+        // Send emails in current batch concurrently
+        const batchPromises = batch.map(async (data) => {
+          try {
+            const mailOptions = {
+              from: config.email.auth.user,
+              to: data.to,
+              subject: data.subject,
+              text: data.text,
+              attachments: data.attachments,
+            };
+
+            const info = await this.transporter.sendMail(mailOptions);
+            console.log(`✅ Email sent to ${data.to}: ${info.messageId}`);
+
+            successCount++;
+            return {
+              to: data.to,
+              success: true,
+              messageId: info.messageId,
+            };
+          } catch (error) {
+            console.error(
+              `❌ Failed to send email to ${data.to}:`,
+              error instanceof Error ? error.message : 'Unknown error',
+            );
+
+            failureCount++;
+            return {
+              to: data.to,
+              success: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            };
+          }
+        });
+
+        // Wait for current batch to complete
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+
+        // Add delay between batches (except for the last batch)
+        if (i + batchSize < datas.length && delayMs > 0) {
+          console.log(`⏳ Waiting ${delayMs}ms before next batch...`);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+
+      const result: BatchEmailResult = {
+        totalEmails: datas.length,
         successCount,
         failureCount,
         results,

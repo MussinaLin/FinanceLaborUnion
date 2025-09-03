@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { HelloResponse, ApiResponse } from '../types';
+import { HelloResponse, ApiResponse, BatchEmailSentData } from '../types';
 import { CSVService } from '../services/csvService';
 import { EmailService } from '../services/emailService';
 import { GoogleSheetsService } from '../services/googleSheetService';
@@ -161,51 +161,39 @@ export class ApiHandler {
     });
   }
 
-  /**
-   * CSV reading endpoint handler
-   */
-  //   async handleReadCSV(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-  //     try {
-  //       const body = event.body ? JSON.parse(event.body) : {};
-  //       const { filePath, csvContent, searchTerm, searchColumn } = body;
+  async sendPaymentLink(): Promise<APIGatewayProxyResult> {
+    // fetch all payment data from sheet's worksheet: yyyymm format
+    const now = new Date();
+    const yyyymm = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    const yyyy = now.getFullYear().toString();
+    const mm = (now.getMonth() + 1).toString();
 
-  //       let data: any[];
+    const paymentDatas = await this.googleSheetService.getAllPaymentDatas(yyyymm);
 
-  //       if (filePath) {
-  //         data = await this.csvService.readCSVFile(filePath);
-  //       } else if (csvContent) {
-  //         data = await this.csvService.readCSVFromString(csvContent);
-  //       } else {
-  //         return this.createResponse(400, {
-  //           success: false,
-  //           message: 'Please provide either filePath or csvContent',
-  //         });
-  //       }
+    const subject = config.mail.subject;
+    // send payment link to each member
 
-  //       // Execute search if search parameters are provided
-  //       if (searchTerm && searchColumn) {
-  //         data = this.csvService.searchRows(data, searchColumn, searchTerm);
-  //       }
+    const batchEmailDatas = paymentDatas.map((d) => {
+      const emailContent = `
+    親愛的會員您好:
+    您的 ${yyyy}年 ${mm}月份會費繳交連結為: ${config.mail.paymentPath}${d.payment_link}
+    
+    謝謝。
+    `;
 
-  //       const response: ApiResponse = {
-  //         success: true,
-  //         message: 'CSV data retrieved successfully',
-  //         data: {
-  //           rows: data,
-  //           count: data.length,
-  //           columns: this.csvService.getColumns(data),
-  //         },
-  //       };
+      return {
+        to: d.member_email,
+        subject: subject,
+        text: emailContent,
+      } as BatchEmailSentData;
+    });
 
-  //       return this.createResponse(200, response);
-  //     } catch (error) {
-  //       console.error('Error reading CSV:', error);
-  //       return this.createResponse(500, {
-  //         success: false,
-  //         message: error instanceof Error ? error.message : 'Failed to read CSV',
-  //       });
-  //     }
-  //   }
+    const result = await this.emailService.sendEmailBatch(batchEmailDatas);
+    return this.createResponse(200, {
+      success: true,
+      data: result,
+    });
+  }
 
   /**
    * Send email endpoint handler
@@ -310,6 +298,8 @@ export class ApiHandler {
         return this.handleECPay(event);
       case '/payment/link':
         return this.generatePaymentLink();
+      case '/payment/link/send':
+        return this.sendPaymentLink();
 
       case '/email':
       case '/email/batch':
