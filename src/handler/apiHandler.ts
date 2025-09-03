@@ -115,10 +115,14 @@ export class ApiHandler {
     }
   }
 
-  async handlePayment(merchantTradeNo: string): Promise<APIGatewayProxyResult> {
+  async getUniquePaymentLink(paymentLink: string): Promise<APIGatewayProxyResult> {
     try {
+      const randomString = Math.random().toString(36).substring(2, 8);
+      const uniquePaymentLink = `${paymentLink}${randomString}`;
+      const memberId = paymentLink.split('_')[0];
+
       const paymentResult = await this.ecPayService.createPaymentForm({
-        merchantTradeNo: merchantTradeNo,
+        merchantTradeNo: uniquePaymentLink,
         totalAmount: Number(config.ecpay.totalAmount),
         tradeDesc: config.ecpay.tradeDesc,
         itemName: config.ecpay.itemName,
@@ -328,14 +332,14 @@ export class ApiHandler {
       }
     } else if (event.path.startsWith('/payment/link')) {
       // gen payment link
-      const merchantTradeNo = event.queryStringParameters?.MerchantTradeNo;
-      console.log(`merchantTradeNo:${merchantTradeNo}`);
-      if (merchantTradeNo) {
-        return this.handlePayment(merchantTradeNo);
+      const paymentLink = event.queryStringParameters?.MerchantTradeNo;
+      console.log(`paymentLink:${paymentLink}`);
+      if (paymentLink) {
+        return this.getUniquePaymentLink(paymentLink);
       } else {
         return this.createResponse(404, {
           success: false,
-          message: 'merchantTradeNo not found',
+          message: 'paymentLink not found',
         });
       }
     }

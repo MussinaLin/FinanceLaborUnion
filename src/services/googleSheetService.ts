@@ -10,10 +10,10 @@ interface MemberData {
 interface PaymentRecord {
   member_id: string;
   member_email: string;
-  payment_link: string;
-  unique_payment_link: string;
-  paid: string;
-  paid_date: string;
+  payment_link: string | undefined;
+  unique_payment_link: string | undefined;
+  paid: string | undefined;
+  paid_date: string | undefined;
 }
 
 export class GoogleSheetsService {
@@ -72,6 +72,22 @@ export class GoogleSheetsService {
       console.error('❌ Error generating payment links:', error);
       throw error;
     }
+  }
+
+  async updatePaymentData(sheetName: string, memberId: string, data: PaymentRecord): Promise<void> {
+    const allPaymentDatas = await this.getAllPaymentDatas(sheetName);
+
+    const sheet = this.doc.sheetsByTitle[sheetName];
+    if (!sheet) {
+      throw new Error(`sheet:${sheetName} not found`);
+    }
+
+    const rows = await sheet.getRows();
+    const targetRow = rows.filter((r) => r.get('member_id') === memberId)[0];
+    if (data.payment_link != undefined) targetRow.set('payment_link', data.payment_link);
+    if (data.unique_payment_link != undefined) targetRow.set('unique_payment_link', data.unique_payment_link);
+    if (data.paid != undefined) targetRow.set('paid', data.paid);
+    if (data.paid_date != undefined) targetRow.set('paid_date', data.paid_date);
   }
 
   /**
@@ -139,10 +155,10 @@ export class GoogleSheetsService {
     await sheet.addRow({
       member_id: record.member_id,
       member_email: record.member_email,
-      payment_link: record.payment_link,
-      unique_payment_link: record.unique_payment_link,
-      paid: record.paid,
-      paid_date: record.paid_date,
+      payment_link: record.payment_link!,
+      unique_payment_link: record.unique_payment_link!,
+      paid: record.paid!,
+      paid_date: record.paid_date!,
     });
   }
 
