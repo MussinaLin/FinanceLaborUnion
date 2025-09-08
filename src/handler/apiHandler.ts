@@ -118,9 +118,14 @@ export class ApiHandler {
   async getUniquePaymentLink(paymentLink: string): Promise<APIGatewayProxyResult> {
     try {
       console.log(`paymentLink:${paymentLink}`);
-      const randomString = Math.random().toString(36).substring(2, 8);
-      const uniquePaymentLink = `${paymentLink}${randomString}`;
+      const now = new Date();
+      const yyyymm = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+
+      const randomString = Math.random().toString(36).substring(2, 6);
       const memberId = paymentLink.split('_')[0];
+      const paymentLinkYYYYMM = paymentLink.split('_')[1];
+      const uniquePaymentLink = `${memberId}${paymentLinkYYYYMM}${randomString}`;
+
       console.log(`memberId:${memberId} uniquePaymentLink:${uniquePaymentLink}`);
 
       const paymentResult = await this.ecPayService.createPaymentForm({
@@ -132,8 +137,6 @@ export class ApiHandler {
       });
 
       // write uniquePaymentLink to googlesheet
-      const now = new Date();
-      const yyyymm = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
       const paymentRecord = {
         payment_link: undefined,
         payment_link_sent: undefined,
@@ -195,7 +198,7 @@ export class ApiHandler {
     const batchEmailDatas = paymentDatas.map((d) => {
       const emailContent = `
     親愛的會員您好:
-    您的 ${yyyy}年 ${mm}月份會費繳交連結為: ${config.mail.paymentPath}${d.payment_link}
+    您的 ${yyyy}年 ${mm}月份會費繳交連結為: ${config.mail.paymentPath}paymentLink=${d.payment_link}
     
     謝謝。
     `;
@@ -211,14 +214,32 @@ export class ApiHandler {
     const result = await this.emailService.sendEmailBatch(batchEmailDatas);
 
     // update email sent result
-    const paymentRecord = {
+    const paymentRecordY = {
       payment_link: undefined,
       payment_link_sent: 'Y',
       unique_payment_link: undefined,
       paid: undefined,
       paid_date: undefined,
     } as PaymentRecord;
-    await this.googleSheetService.updatePaymentData(yyyymm, memberId, paymentRecord);
+
+    const paymentRecordN = {
+      payment_link: undefined,
+      payment_link_sent: 'N',
+      unique_payment_link: undefined,
+      paid: undefined,
+      paid_date: undefined,
+    } as PaymentRecord;
+
+    const [memberIds, datas] = result.results.reduce<[string[], PaymentRecord[]]>(
+      (acc, r) => {
+        acc[0].push(r.member_id);
+        acc[1].push(r.success ? paymentRecordY : paymentRecordN);
+        return acc;
+      },
+      [[], []],
+    );
+
+    await this.googleSheetService.updatePaymentDataBatch(yyyymm, memberIds, datas);
 
     return this.createResponse(200, {
       success: true,
@@ -346,7 +367,7 @@ export class ApiHandler {
       }
     } else if (event.path.startsWith('/payment/link')) {
       // gen payment link
-      const paymentLink = event.queryStringParameters?.MerchantTradeNo;
+      const paymentLink = event.queryStringParameters?.paymentLink;
       console.log(`paymentLink:${paymentLink}`);
       if (paymentLink) {
         return this.getUniquePaymentLink(paymentLink);

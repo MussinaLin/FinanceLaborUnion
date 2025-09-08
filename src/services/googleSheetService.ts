@@ -22,8 +22,6 @@ export class GoogleSheetsService {
   private serviceAccountAuth: JWT;
 
   constructor(spreadsheetId: string, serviceAccountKey: any) {
-    console.log(serviceAccountKey.clientEmail);
-    console.log(serviceAccountKey.privateKey);
     this.serviceAccountAuth = new JWT({
       email: serviceAccountKey.clientEmail,
       key: serviceAccountKey.privateKey,
@@ -31,6 +29,7 @@ export class GoogleSheetsService {
     });
 
     this.doc = new GoogleSpreadsheet(spreadsheetId, this.serviceAccountAuth);
+    this.doc.loadInfo();
   }
 
   /**
@@ -38,7 +37,7 @@ export class GoogleSheetsService {
    */
   async generatePaymentLinks(): Promise<void> {
     try {
-      await this.doc.loadInfo();
+      // await this.doc.loadInfo();
       console.log('Connected to Google Sheets:', this.doc.title);
 
       // Get current year-month format (YYYYMM)
@@ -91,6 +90,7 @@ export class GoogleSheetsService {
     if (data.unique_payment_link != undefined) targetRow.set('unique_payment_link', data.unique_payment_link);
     if (data.paid != undefined) targetRow.set('paid', data.paid);
     if (data.paid_date != undefined) targetRow.set('paid_date', data.paid_date);
+    await targetRow.save();
   }
 
   async updatePaymentDataBatch(sheetName: string, memberIds: string[], datas: PaymentRecord[]): Promise<void> {
@@ -114,6 +114,7 @@ export class GoogleSheetsService {
       if (data.unique_payment_link != undefined) targetRow.set('unique_payment_link', data.unique_payment_link);
       if (data.paid != undefined) targetRow.set('paid', data.paid);
       if (data.paid_date != undefined) targetRow.set('paid_date', data.paid_date);
+      await targetRow.save();
     }
   }
 

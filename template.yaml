@@ -9,11 +9,11 @@ Resources:
       Handler: index.handler
       Runtime: nodejs18.x
       Events:
-        # PaymentApi:
-        #   Type: Api
-        #   Properties:
-        #     Path: /payment/link/{MerchantTradeNo}
-        #     Method: get
+        PaymentApi:
+          Type: Api
+          Properties:
+            Path: /payment/link
+            Method: get
         PaymentDetailsApi:
           Type: Api
           Properties:
