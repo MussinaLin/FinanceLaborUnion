@@ -20,6 +20,7 @@ export interface EmailOptions {
 
 export interface BatchEmailSentData {
   to: string;
+  member_id: string;
   subject: string;
   text: string;
   attachments?: Array<{
@@ -34,6 +35,7 @@ export interface BatchEmailResult {
   failureCount: number;
   results: Array<{
     to: string;
+    member_id: string;
     success: boolean;
     messageId?: string;
     error?: string;

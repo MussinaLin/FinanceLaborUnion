@@ -7,10 +7,11 @@ interface MemberData {
   member_email: string;
 }
 
-interface PaymentRecord {
+export interface PaymentRecord {
   member_id: string;
   member_email: string;
   payment_link: string | undefined;
+  payment_link_sent: string | undefined;
   unique_payment_link: string | undefined;
   paid: string | undefined;
   paid_date: string | undefined;
@@ -59,10 +60,11 @@ export class GoogleSheetsService {
           member_id: member.member_id,
           member_email: member.member_email,
           payment_link: paymentLink,
+          payment_link_sent: 'N',
           unique_payment_link: '', // Leave blank
           paid: '', // Leave blank
           paid_date: '', // Leave blank
-        });
+        } as PaymentRecord);
 
         console.log(`Generated payment link for ${member.member_id}: ${paymentLink}`);
       }
@@ -75,7 +77,7 @@ export class GoogleSheetsService {
   }
 
   async updatePaymentData(sheetName: string, memberId: string, data: PaymentRecord): Promise<void> {
-    const allPaymentDatas = await this.getAllPaymentDatas(sheetName);
+    console.log(`[updatePaymentData] sheetName:${sheetName} memberId:${memberId}`);
 
     const sheet = this.doc.sheetsByTitle[sheetName];
     if (!sheet) {
@@ -85,9 +87,34 @@ export class GoogleSheetsService {
     const rows = await sheet.getRows();
     const targetRow = rows.filter((r) => r.get('member_id') === memberId)[0];
     if (data.payment_link != undefined) targetRow.set('payment_link', data.payment_link);
+    if (data.payment_link_sent != undefined) targetRow.set('payment_link_sent', data.payment_link_sent);
     if (data.unique_payment_link != undefined) targetRow.set('unique_payment_link', data.unique_payment_link);
     if (data.paid != undefined) targetRow.set('paid', data.paid);
     if (data.paid_date != undefined) targetRow.set('paid_date', data.paid_date);
+  }
+
+  async updatePaymentDataBatch(sheetName: string, memberIds: string[], datas: PaymentRecord[]): Promise<void> {
+    console.log(`[updatePaymentDataBatch] sheetName:${sheetName}`);
+    const idLength = memberIds.length;
+    const dataLength = datas.length;
+    if (idLength != dataLength) throw new Error('idLength != dataLength');
+
+    const sheet = this.doc.sheetsByTitle[sheetName];
+    if (!sheet) {
+      throw new Error(`sheet:${sheetName} not found`);
+    }
+
+    const rows = await sheet.getRows();
+    for (let i = 0; i < memberIds.length; i++) {
+      const memberId = memberIds[i];
+      const targetRow = rows.filter((r) => r.get('member_id') === memberId)[0];
+      const data = datas[i];
+      if (data.payment_link != undefined) targetRow.set('payment_link', data.payment_link);
+      if (data.payment_link_sent != undefined) targetRow.set('payment_link_sent', data.payment_link_sent);
+      if (data.unique_payment_link != undefined) targetRow.set('unique_payment_link', data.unique_payment_link);
+      if (data.paid != undefined) targetRow.set('paid', data.paid);
+      if (data.paid_date != undefined) targetRow.set('paid_date', data.paid_date);
+    }
   }
 
   /**
@@ -101,14 +128,18 @@ export class GoogleSheetsService {
 
     const rows = await sheet.getRows();
     return rows
-      .map((row) => ({
-        member_id: row.get('member_id') || '',
-        member_email: row.get('member_email') || '',
-        payment_link: row.get('payment_link') || '',
-        unique_payment_link: row.get('unique_payment_link') || '',
-        paid: row.get('paid') || '',
-        paid_date: row.get('paid_date') || '',
-      }))
+      .map(
+        (row) =>
+          ({
+            member_id: row.get('member_id') || '',
+            member_email: row.get('member_email') || '',
+            payment_link: row.get('payment_link') || '',
+            payment_link_sent: row.get('payment_link_sent') || '',
+            unique_payment_link: row.get('unique_payment_link') || '',
+            paid: row.get('paid') || '',
+            paid_date: row.get('paid_date') || '',
+          }) as PaymentRecord,
+      )
       .filter((member) => member.member_id && member.member_email);
   }
 
@@ -140,7 +171,15 @@ export class GoogleSheetsService {
       // Create new sheet with headers
       sheet = await this.doc.addSheet({
         title: yyyymm,
-        headerValues: ['member_id', 'member_email', 'payment_link', 'unique_payment_link', 'paid', 'paid_date'],
+        headerValues: [
+          'member_id',
+          'member_email',
+          'payment_link',
+          'payment_link_sent',
+          'unique_payment_link',
+          'paid',
+          'paid_date',
+        ],
       });
       console.log(`Created new sheet: ${yyyymm}`);
     }
@@ -156,6 +195,7 @@ export class GoogleSheetsService {
       member_id: record.member_id,
       member_email: record.member_email,
       payment_link: record.payment_link!,
+      payment_link_sent: record.payment_link_sent!,
       unique_payment_link: record.unique_payment_link!,
       paid: record.paid!,
       paid_date: record.paid_date!,

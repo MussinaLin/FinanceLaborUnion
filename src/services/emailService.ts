@@ -220,6 +220,7 @@ export class EmailService {
             successCount++;
             return {
               to: data.to,
+              member_id: data.member_id,
               success: true,
               messageId: info.messageId,
             };
@@ -232,6 +233,7 @@ export class EmailService {
             failureCount++;
             return {
               to: data.to,
+              member_id: data.member_id,
               success: false,
               error: error instanceof Error ? error.message : 'Unknown error',
             };

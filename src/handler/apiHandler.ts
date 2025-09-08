@@ -2,7 +2,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { HelloResponse, ApiResponse, BatchEmailSentData } from '../types';
 import { CSVService } from '../services/csvService';
 import { EmailService } from '../services/emailService';
-import { GoogleSheetsService } from '../services/googleSheetService';
+import { GoogleSheetsService, PaymentRecord } from '../services/googleSheetService';
 import { ECPayService } from '../services/ecpayService';
 import config from '../configs';
 
@@ -117,9 +117,11 @@ export class ApiHandler {
 
   async getUniquePaymentLink(paymentLink: string): Promise<APIGatewayProxyResult> {
     try {
+      console.log(`paymentLink:${paymentLink}`);
       const randomString = Math.random().toString(36).substring(2, 8);
       const uniquePaymentLink = `${paymentLink}${randomString}`;
       const memberId = paymentLink.split('_')[0];
+      console.log(`memberId:${memberId} uniquePaymentLink:${uniquePaymentLink}`);
 
       const paymentResult = await this.ecPayService.createPaymentForm({
         merchantTradeNo: uniquePaymentLink,
@@ -129,8 +131,21 @@ export class ApiHandler {
         returnURL: config.ecpay.returnURL,
       });
 
+      // write uniquePaymentLink to googlesheet
+      const now = new Date();
+      const yyyymm = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+      const paymentRecord = {
+        payment_link: undefined,
+        payment_link_sent: undefined,
+        unique_payment_link: uniquePaymentLink,
+        paid: 'N',
+        paid_date: undefined,
+      } as PaymentRecord;
+      await this.googleSheetService.updatePaymentData(yyyymm, memberId, paymentRecord);
+
       return this.createResponse(200, paymentResult.redirectUrl);
     } catch (error) {
+      console.log(error);
       return this.createResponse(500, {
         success: false,
         message: 'Internal server error',
@@ -187,12 +202,24 @@ export class ApiHandler {
 
       return {
         to: d.member_email,
+        member_id: d.member_id,
         subject: subject,
         text: emailContent,
       } as BatchEmailSentData;
     });
 
     const result = await this.emailService.sendEmailBatch(batchEmailDatas);
+
+    // update email sent result
+    const paymentRecord = {
+      payment_link: undefined,
+      payment_link_sent: 'Y',
+      unique_payment_link: undefined,
+      paid: undefined,
+      paid_date: undefined,
+    } as PaymentRecord;
+    await this.googleSheetService.updatePaymentData(yyyymm, memberId, paymentRecord);
+
     return this.createResponse(200, {
       success: true,
       data: result,
@@ -280,19 +307,6 @@ export class ApiHandler {
       path: event.path,
       queryString: event.queryStringParameters,
     });
-
-    // Handle CORS preflight
-    if (event.httpMethod === 'OPTIONS') {
-      return this.createResponse(200, {});
-    }
-
-    // if (event.path.startsWith('/payment/')) {
-    //   const merchantTradeNo = event.pathParameters?.MerchantTradeNo;
-    //   console.log(`merchantTradeNo:${merchantTradeNo}`);
-    //   if (merchantTradeNo) {
-    //     return this.handlePayment(merchantTradeNo);
-    //   }
-    // }
 
     // Route to appropriate handler
     switch (event.path) {
